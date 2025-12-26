@@ -1,237 +1,326 @@
-// src/app/page.tsx
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TarotCard from '@/components/TarotCard';
-import { drawCards, DrawnCard } from '@/utils/tarotLogic';
+// ✅ 修复 Import 路径
+import { DrawnCard } from '@/utils/tarotLogic';
+import { TAROT_DECK } from '@/data/tarot';
+
+// --- 组件：极光背景 ---
+const AuroraBackground = () => (
+    <div className="fixed inset-0 z-0 overflow-hidden bg-[#050510]">
+        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] bg-purple-900/20 rounded-full blur-[120px] mix-blend-screen animate-pulse duration-[4000ms]" />
+        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] bg-indigo-900/20 rounded-full blur-[120px] mix-blend-screen animate-pulse duration-[7000ms]" />
+        <div className="absolute -bottom-[20%] left-[20%] w-[60%] h-[60%] bg-blue-900/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="noise-overlay" /> {/* 引用全局噪点 */}
+    </div>
+);
 
 export default function Home() {
-  const [step, setStep] = useState<'input' | 'shuffle' | 'reveal' | 'reading'>('input');
-  const [question, setQuestion] = useState('');
-  const [cards, setCards] = useState<DrawnCard[] | null>(null);
-  const [reading, setReading] = useState('');
-  const [isReadingLoading, setIsReadingLoading] = useState(false);
-  const readingRef = useRef<HTMLDivElement>(null);
+    const [step, setStep] = useState<'input' | 'shuffle' | 'pick' | 'reading'>('input');
+    const [question, setQuestion] = useState('');
+    const [selectedCards, setSelectedCards] = useState<DrawnCard[]>([]);
+    const [deck, setDeck] = useState<any[]>([]);
+    const [reading, setReading] = useState('');
+    const [isReadingLoading, setIsReadingLoading] = useState(false);
 
-  const handleShuffle = async () => {
-    setStep('shuffle');
-    
-    // 模拟洗牌动画
-    setTimeout(() => {
-      const drawnCards = drawCards(3);
-      setCards(drawnCards);
-      setStep('reveal');
-    }, 2000);
-  };
+    // 生成视觉上的牌堆
+    useEffect(() => {
+        setDeck(Array.from({ length: 22 }, (_, i) => ({ id: i })));
+    }, []);
 
-  const handleReveal = async () => {
-    setStep('reading');
-    setIsReadingLoading(true);
-    setReading('');
+    const handleStart = () => {
+        if (!question.trim()) return;
+        setStep('shuffle');
+        setTimeout(() => setStep('pick'), 2500);
+    };
 
-    try {
-      const response = await fetch('/api/tarot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question }),
-      });
+    const handlePick = (index: number) => {
+        if (selectedCards.length >= 3) return;
 
-      if (!response.ok) {
-        throw new Error('API 调用失败');
-      }
+        // 抽牌逻辑
+        const randomIdx = Math.floor(Math.random() * TAROT_DECK.length);
+        const cardData = TAROT_DECK[randomIdx];
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-              
-              try {
-                const json = JSON.parse(data);
-                if (json.choices && json.choices[0]?.delta?.content) {
-                  setReading(prev => prev + json.choices[0].delta.content);
-                }
-              } catch (e) {
-                // 忽略解析错误
-              }
-            }
-          }
+        // 简单去重
+        if (selectedCards.some(c => c.id === cardData.id)) {
+            handlePick(index);
+            return;
         }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setReading('抱歉，占卜过程中出现了问题。请稍后再试。');
-    } finally {
-      setIsReadingLoading(false);
-    }
-  };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-black text-white">
-      {/* 背景装饰 */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-3 h-3 bg-pink-400 rounded-full animate-bounce"></div>
-        <div className="absolute bottom-20 left-1/3 w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-      </div>
+        const newCard: DrawnCard = {
+            ...cardData,
+            isReversed: Math.random() > 0.5,
+        };
 
-      <div className="relative container mx-auto px-4 py-8">
-        {/* 标题 */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            神秘塔罗占卜
-          </h1>
-          <p className="text-gray-300 mt-2">倾听内心的声音，探寻命运的指引</p>
-        </motion.div>
+        const newSelected = [...selectedCards, newCard];
+        setSelectedCards(newSelected);
 
-        {/* 主要内容区域 */}
-        <div className="max-w-4xl mx-auto">
-          {/* 输入阶段 */}
-          <AnimatePresence mode="wait">
-            {step === 'input' && (
-              <motion.div
-                key="input"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 text-center"
-              >
-                <h2 className="text-2xl font-semibold mb-6">静心默念你的问题</h2>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="例如：我最近的事业运势如何？"
-                    className="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                  <button
-                    onClick={handleShuffle}
-                    disabled={!question.trim()}
-                    className="w-full py-3 px-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-semibold text-white hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
-                  >
-                    开始占卜
-                  </button>
-                </div>
-              </motion.div>
-            )}
+        if (newSelected.length === 3) {
+            setTimeout(() => startReading(newSelected), 1500);
+        }
+    };
 
-            {/* 洗牌阶段 */}
-            {step === 'shuffle' && (
-              <motion.div
-                key="shuffle"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center"
-              >
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
-                  <h2 className="text-2xl font-semibold mb-6">正在洗牌...</h2>
-                  <div className="flex justify-center space-x-4">
-                    {[...Array(5)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        className="w-16 h-28 bg-gradient-to-br from-purple-900 to-indigo-900 border-2 border-gold-400 rounded-lg"
-                        animate={{
-                          y: [0, -20, 0],
-                          rotate: [0, 10, -10, 0]
-                        }}
-                        transition={{
-                          duration: 0.5,
-                          delay: i * 0.1,
-                          repeat: Infinity,
-                          repeatType: "reverse"
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-gray-300 mt-4">命运的齿轮正在转动...</p>
-                </div>
-              </motion.div>
-            )}
+    const startReading = async (cards: DrawnCard[]) => {
+        setStep('reading');
+        setIsReadingLoading(true);
+        try {
+            const res = await fetch('/api/tarot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question }), // 实际生产环境建议把抽到的牌也发给后端
+            });
 
-            {/* 揭示阶段 */}
-            {step === 'reveal' && cards && (
-              <motion.div
-                key="reveal"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center"
-              >
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
-                  <h2 className="text-2xl font-semibold mb-6">三张牌已抽出</h2>
-                  <div className="flex justify-center space-x-8">
-                    <TarotCard card={cards[0]} isRevealed={false} position="past" />
-                    <TarotCard card={cards[1]} isRevealed={false} position="present" />
-                    <TarotCard card={cards[2]} isRevealed={false} position="future" />
-                  </div>
-                  <button
-                    onClick={handleReveal}
-                    className="mt-8 py-3 px-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-semibold text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200 transform hover:scale-105"
-                  >
-                    揭示命运
-                  </button>
-                </div>
-              </motion.div>
-            )}
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            if (!reader) return;
 
-            {/* 阅读阶段 */}
-            {step === 'reading' && (
-              <motion.div
-                key="reading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-6"
-              >
-                {/* 占卜结果 */}
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
-                  <h2 className="text-2xl font-semibold mb-6">占卜结果</h2>
-                  {cards && (
-                    <div className="flex justify-center space-x-8 mb-6">
-                      <TarotCard card={cards[0]} isRevealed={true} position="past" />
-                      <TarotCard card={cards[1]} isRevealed={true} position="present" />
-                      <TarotCard card={cards[2]} isRevealed={true} position="future" />
-                    </div>
-                  )}
-                </div>
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+                        try {
+                            const json = JSON.parse(data);
+                            if (json.choices?.[0]?.delta?.content) {
+                                setReading(prev => prev + json.choices[0].delta.content);
+                            }
+                        } catch (e) {}
+                    }
+                }
+            }
+        } catch (e) {
+            setReading("连接灵界失败，请重试...");
+        } finally {
+            setIsReadingLoading(false);
+        }
+    };
 
-                {/* AI 解读 */}
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
-                  <h3 className="text-xl font-semibold mb-4">AI 解读</h3>
-                  <div 
-                    ref={readingRef}
-                    className="prose prose-invert max-w-none text-gray-200 leading-relaxed"
-                    style={{ whiteSpace: 'pre-wrap' }}
-                  >
-                    {reading || (isReadingLoading ? '正在生成解读...' : '')}
-                  </div>
-                  {isReadingLoading && (
-                    <div className="flex justify-center mt-4">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+    const reset = () => {
+        setStep('input');
+        setQuestion('');
+        setSelectedCards([]);
+        setReading('');
+    };
+
+    return (
+        <div className="relative min-h-screen text-slate-200 font-sans selection:bg-purple-500/30">
+            <AuroraBackground />
+
+            <main className="relative z-10 container mx-auto px-4 min-h-screen flex flex-col items-center justify-center py-10">
+
+                {/* Header - 始终显示，但根据状态改变大小 */}
+                <motion.header
+                    layout
+                    className={`text-center mb-8 ${step === 'reading' ? 'scale-75' : 'scale-100'}`}
+                >
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="inline-block"
+                    >
+                        <h1 className="text-5xl md:text-7xl font-heading font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-[#fff5d1] to-[#c6a665] drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]">
+                            ARCANA
+                        </h1>
+                        <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-amber-500/50 to-transparent mt-4 mb-2" />
+                        <p className="text-purple-200/40 text-xs tracking-[0.5em] uppercase font-heading">The Mystic Oracle</p>
+                    </motion.div>
+                </motion.header>
+
+                <AnimatePresence mode="wait">
+
+                    {/* 1. 输入阶段 */}
+                    {step === 'input' && (
+                        <motion.div
+                            key="input"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 1.1, filter: 'blur(10px)' }}
+                            className="w-full max-w-lg"
+                        >
+                            <div className="glass-panel p-12 rounded-2xl text-center relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
+
+                                <h2 className="text-2xl text-purple-100 font-heading mb-8 font-light">What seeks an answer?</h2>
+
+                                <input
+                                    type="text"
+                                    value={question}
+                                    onChange={(e) => setQuestion(e.target.value)}
+                                    placeholder="Ask the cards..."
+                                    className="w-full bg-transparent border-b border-white/10 px-4 py-3 text-2xl text-center text-amber-50 placeholder-white/10 focus:outline-none focus:border-amber-500/50 transition-colors font-serif italic"
+                                />
+
+                                <motion.button
+                                    whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(168,85,247,0.4)" }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={handleStart}
+                                    disabled={!question.trim()}
+                                    className="mt-12 px-10 py-4 bg-gradient-to-r from-[#2a2442] to-[#1e1b2e] border border-white/10 rounded-full text-amber-100/80 font-heading tracking-widest text-sm uppercase hover:text-white transition-all disabled:opacity-50"
+                                >
+                                    Reveal Destiny
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* 2. 洗牌动画 */}
+                    {step === 'shuffle' && (
+                        <motion.div
+                            key="shuffle"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center"
+                        >
+                            <div className="relative w-40 h-60">
+                                {[...Array(5)].map((_, i) => (
+                                    <motion.div
+                                        key={i}
+                                        className="absolute inset-0 rounded-xl border border-amber-500/30 bg-[#151025]"
+                                        animate={{
+                                            rotate: [0, i * 15 - 30, 0],
+                                            x: [0, i * 20 - 40, 0],
+                                            scale: [1, 1.1, 1]
+                                        }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                    />
+                                ))}
+                            </div>
+                            <p className="mt-12 text-purple-300/50 font-heading tracking-widest animate-pulse">Shuffling Fate...</p>
+                        </motion.div>
+                    )}
+
+                    {/* 3. 选牌阶段 */}
+                    {step === 'pick' && (
+                        <motion.div
+                            key="pick"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="w-full max-w-6xl flex flex-col items-center"
+                        >
+                            <h2 className="text-xl text-purple-200/60 font-heading tracking-widest mb-12">
+                                Select Three Cards ({selectedCards.length}/3)
+                            </h2>
+
+                            {/* 扇形牌阵 */}
+                            <div className="relative h-[400px] w-full flex justify-center items-end perspective-[1200px] overflow-visible">
+                                {deck.map((card, i) => {
+                                    // 计算扇形布局
+                                    const total = deck.length;
+                                    const angle = (i - total / 2) * 5; // 角度分布
+                                    const yOffset = Math.abs(i - total / 2) * 5; // 拱形分布
+
+                                    return (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ y: 500, opacity: 0 }}
+                                            animate={{
+                                                y: yOffset,
+                                                rotate: angle,
+                                                x: (i - total / 2) * 20
+                                            }}
+                                            whileHover={{
+                                                y: -100,
+                                                scale: 1.2,
+                                                zIndex: 100,
+                                                transition: { duration: 0.2 }
+                                            }}
+                                            onClick={() => handlePick(i)}
+                                            className="absolute w-24 h-40 md:w-32 md:h-52 bg-[#1a1528] border border-white/10 rounded-lg shadow-2xl cursor-pointer transform-gpu origin-bottom hover:border-amber-500/50"
+                                            style={{
+                                                boxShadow: '0 4px 6px rgba(0,0,0,0.5)',
+                                                backgroundImage: `url("https://www.transparenttextures.com/patterns/stardust.png")`
+                                            }}
+                                        >
+                                            <div className="w-full h-full opacity-30 bg-gradient-to-b from-purple-500/20 to-transparent" />
+                                            <div className="absolute inset-2 border border-white/5 rounded opacity-50" />
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* 已选卡槽 */}
+                            <div className="fixed bottom-10 flex gap-4 pointer-events-none">
+                                {[0, 1, 2].map((idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`w-16 h-24 border border-white/10 rounded-md transition-colors ${selectedCards[idx] ? 'bg-amber-500/20 border-amber-500/50' : 'bg-transparent'}`}
+                                    />
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* 4. 解读结果 */}
+                    {step === 'reading' && (
+                        <motion.div
+                            key="reading"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="w-full max-w-7xl flex flex-col items-center"
+                        >
+                            {/* 牌阵展示区 */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-16 mb-16 w-full justify-items-center">
+                                {selectedCards.map((card, idx) => (
+                                    <motion.div
+                                        key={card.id}
+                                        initial={{ opacity: 0, y: 50 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.2 }}
+                                    >
+                                        <TarotCard
+                                            card={card}
+                                            isRevealed={true}
+                                            position={idx === 0 ? 'past' : idx === 1 ? 'present' : 'future'}
+                                        />
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* 解读文字区 */}
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.8 }}
+                                className="glass-panel w-full max-w-4xl p-8 md:p-12 rounded-2xl relative"
+                            >
+                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-[#050510] border border-white/10 rounded-full flex items-center justify-center z-20">
+                                    <span className="text-xl">✦</span>
+                                </div>
+
+                                <div className="prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300">
+                                    {reading ? (
+                                        <div className="whitespace-pre-wrap">{reading}</div>
+                                    ) : (
+                                        <div className="text-center py-10 text-purple-200/50 animate-pulse">
+                                            Invoking the spirits...
+                                        </div>
+                                    )}
+                                </div>
+
+                                {!isReadingLoading && (
+                                    <div className="text-center mt-12">
+                                        <button
+                                            onClick={reset}
+                                            className="text-xs text-purple-300/50 hover:text-purple-300 tracking-[0.2em] uppercase transition-colors border-b border-transparent hover:border-purple-300 pb-1"
+                                        >
+                                            Start New Reading
+                                        </button>
+                                    </div>
+                                )}
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                </AnimatePresence>
+            </main>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
