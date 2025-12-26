@@ -4,7 +4,7 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TarotCard from '@/components/TarotCard';
-import { drawThreeCards, DrawnCard } from '@/utils/tarotLogic';
+import { drawCards, DrawnCard } from '@/utils/tarotLogic';
 
 export default function Home() {
   const [step, setStep] = useState<'input' | 'shuffle' | 'reveal' | 'reading'>('input');
@@ -19,7 +19,7 @@ export default function Home() {
     
     // 模拟洗牌动画
     setTimeout(() => {
-      const drawnCards = drawThreeCards();
+      const drawnCards = drawCards(3);
       setCards(drawnCards);
       setStep('reveal');
     }, 2000);
