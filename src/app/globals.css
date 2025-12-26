@@ -2,59 +2,98 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 引入古典神秘学字体 */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,300;0,500;0,700;1,400&display=swap');
-
 :root {
-    --gold-primary: #ffd700;
-    --gold-secondary: #bf953f;
+    --foreground-rgb: 230, 230, 255;
+    --background-start-rgb: 5, 5, 10;
+    --background-end-rgb: 20, 10, 30;
 }
 
 body {
-    @apply bg-[#050510] text-slate-200 overflow-x-hidden;
-    font-family: 'Cormorant Garamond', serif; /* 正文使用高雅的衬线体 */
+    color: rgb(var(--foreground-rgb));
+    background: radial-gradient(circle at center, rgb(var(--background-end-rgb)), rgb(var(--background-start-rgb)));
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* 标题字体 */
-h1, h2, h3, h4, h5, h6, .font-heading {
-    font-family: 'Cinzel', serif;
-}
-
-/* 全局噪点纹理 - 消除纯色的塑料感 */
-.noise-overlay {
+/* 噪点纹理 - 增加胶片质感 */
+.bg-noise {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 50;
+    z-index: 0;
     opacity: 0.05;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
-/* 隐藏滚动条但保留功能 */
+/* 3D 透视容器 */
+.perspective-1000 {
+    perspective: 1000px;
+}
+.preserve-3d {
+    transform-style: preserve-3d;
+}
+.backface-hidden {
+    backface-visibility: hidden;
+}
+.rotate-y-180 {
+    transform: rotateY(180deg);
+}
+
+/* 星星动画 */
+@keyframes twinkle {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+.star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--duration, 3s) infinite ease-in-out;
+}
+
+/* 呼吸光效文字 */
+.text-glow {
+    text-shadow: 0 0 10px rgba(167, 139, 250, 0.5), 0 0 20px rgba(167, 139, 250, 0.3);
+}
+
+/* 玻璃拟态卡片 */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* 自定义滚动条 */
 ::-webkit-scrollbar {
     width: 6px;
-    background: transparent;
+}
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
 }
 ::-webkit-scrollbar-thumb {
-    background: rgba(139, 92, 246, 0.2);
-    border-radius: 10px;
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.6);
 }
 
-/* 烫金文字效果 */
-.text-gold-gradient {
-    background: linear-gradient(to bottom, #cfc09f 22%, #634f2c 24%, #cfc09f 26%, #cfc09f 27%, #ffecb3 40%, #3a2c0f 78%);
-    -webkit-background-clip: text;
-    color: transparent;
+/* Markdown 内容样式 */
+.prose-invert h3 {
+    color: #e9d5ff; /* purple-200 */
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
 }
-
-/* 玻璃拟态容器高级版 */
-.glass-panel {
-    background: rgba(20, 15, 40, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+.prose-invert p {
+    line-height: 1.8;
+    color: #d8b4fe; /* purple-300 */
+    opacity: 0.9;
+}
+.prose-invert strong {
+    color: #fcd34d; /* amber-300 */
 }

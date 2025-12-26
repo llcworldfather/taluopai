@@ -1,8 +1,14 @@
 // src/app/api/tarot/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 import { drawCards, generateAIPrompt } from '@/utils/tarotLogic';
 
-// 简单的 OpenAI 请求函数（不使用 Vercel AI SDK）
+// 创建 DeepSeek OpenAI 客户端
+const openai = new OpenAI({
+  baseURL: 'https://api.deepseek.com',
+  apiKey: 'sk-2317cc6c1c7e44f8ad8e29f1632391b9',
+});
+
 async function getTarotReading(question: string, cards: any[]) {
   const prompt = `
 你是一位神秘、富有同理心且直觉敏锐的塔罗牌占卜师。
@@ -24,26 +30,15 @@ ${generateAIPrompt(question, cards)}
 `;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: prompt }],
-        stream: true,
-      }),
+    const response = await openai.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [{ role: 'system', content: prompt }],
+      stream: true,
     });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
 
     return response;
   } catch (error) {
-    console.error('Error calling OpenAI API:', error);
+    console.error('Error calling DeepSeek API:', error);
     throw error;
   }
 }
@@ -63,7 +58,20 @@ export async function POST(request: NextRequest) {
     const aiResponse = await getTarotReading(question, cards);
 
     // 返回流式响应
-    return new NextResponse(aiResponse.body, {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of aiResponse) {
+          if (chunk.choices && chunk.choices[0]?.delta?.content) {
+            const text = chunk.choices[0].delta.content;
+            controller.enqueue(encoder.encode(text));
+          }
+        }
+        controller.close();
+      }
+    });
+
+    return new NextResponse(stream, {
       headers: {
         'Content-Type': 'text/plain',
       },
